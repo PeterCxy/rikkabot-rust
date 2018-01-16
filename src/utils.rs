@@ -46,6 +46,31 @@ pub fn build_query_string(params: HashMap<String, Box<ToString>>) -> String {
         .fold(String::new(), |x, y| x + &y)
 }
 
+/*
+ * Build HTTP request params (HashMap<String, Box<ToString>>)
+ * Usage:
+ *  let options = params!{
+ *      "key1" => value2,
+ *      "key2" => value2
+ * }
+ */
+macro_rules! params {
+    (
+        $(
+            $x:expr => $y:expr
+        ),*
+    ) => {
+        // Expand to a block so that we can directly assign to a variable
+        {
+            let mut m: HashMap<String, Box<ToString>> = HashMap::new();
+            $(
+                m.insert(String::from($x), Box::new($y));
+            )*
+            m
+        }
+    }
+}
+
 // Glue code to make error-chain work with futures
 // Source: <https://github.com/alexcrichton/sccache/blob/master/src/errors.rs>
 pub type SFuture<T> = Box<Future<Item = T, Error = Error>>;

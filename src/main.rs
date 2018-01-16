@@ -17,6 +17,7 @@ use std::env;
 use tokio_core::reactor::Core;
 
 mod telegram;
+#[macro_use]
 mod utils;
 
 mod errors {
@@ -43,8 +44,10 @@ fn main() {
     let tg = telegram::Telegram::new(core.handle(), &config.token);
 
     // TEST
-    let mut map: HashMap<String, Box<ToString>> = HashMap::new();
-    map.insert(String::from("timeout"), Box::new("600"));
+    let map = params!{
+        "timeout" => 600,
+        "offset" => 0
+    };
     let work = tg.get("getUpdates", map)
         .and_then(|res| {
             println!("{:?}", res);
