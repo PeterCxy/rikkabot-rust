@@ -43,7 +43,8 @@ pub fn build_query_string(params: HashMap<String, Box<ToString>>) -> String {
         .map(|(k, v)| {
             format!("{}={}", k, utf8_percent_encode(&v.to_string(), DEFAULT_ENCODE_SET).to_string())
         })
-        .fold(String::new(), |x, y| x + &y)
+        .collect::<Vec<String>>()
+        .join("&")
 }
 
 /*
