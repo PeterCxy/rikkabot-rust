@@ -13,7 +13,7 @@ use self::hyper_tls::HttpsConnector;
 use self::tokio_core::reactor::{Handle};
 
 use utils;
-use utils::{SFuture, FutureChainErr};
+use utils::{BoxFuture, FutureChainErr};
 
 const REQ_TIMEOUT: u32 = 600;
 
@@ -49,7 +49,7 @@ impl Telegram {
             .expect("Illegal URL")
     }
 
-    pub fn get<'a>(&self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFutureResponse<'a> {
+    pub fn get<'a>(&self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFuture<'a, Response> {
         Client::configure()
             .connector(HttpsConnector::new(4, &self.tokio_handle).unwrap())
             .build(&self.tokio_handle)
@@ -63,7 +63,7 @@ impl Telegram {
             .chain_err(|| "GET request failed")
     }
 
-    pub fn next_update<'a>(&'a mut self) -> SFuture<'a, Vec<Update>> {
+    pub fn next_update<'a>(&'a mut self) -> BoxFuture<'a, Vec<Update>> {
         self.get("getUpdates", params!{
             "timeout" => REQ_TIMEOUT,
             "offset" => self.last_update
@@ -113,5 +113,3 @@ pub struct Message {
 pub enum Result {
     Updates(Vec<Update>)
 }
-
-pub type BoxFutureResponse<'a> = SFuture<'a, Response>;

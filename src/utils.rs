@@ -74,10 +74,11 @@ macro_rules! params {
 
 // Glue code to make error-chain work with futures
 // Source: <https://github.com/alexcrichton/sccache/blob/master/src/errors.rs>
-pub type SFuture<'a, T> = Box<'a + Future<Item = T, Error = Error>>;
+// Modified to avoid static lifetimes
+pub type BoxFuture<'a, T> = Box<'a + Future<Item = T, Error = Error>>;
 
 pub trait FutureChainErr<'a, T> {
-    fn chain_err<F, E>(self, callback: F) -> SFuture<'a, T>
+    fn chain_err<F, E>(self, callback: F) -> BoxFuture<'a, T>
         where F: FnOnce() -> E + 'a,
               E: Into<ErrorKind>;
 }
@@ -86,7 +87,7 @@ impl<'a, F> FutureChainErr<'a, F::Item> for F
     where F: Future + 'a,
           F::Error: error::Error + Send + 'static,
 {
-    fn chain_err<C, E>(self, callback: C) -> SFuture<'a, F::Item>
+    fn chain_err<C, E>(self, callback: C) -> BoxFuture<'a, F::Item>
         where C: FnOnce() -> E + 'a,
               E: Into<ErrorKind>,
     {
