@@ -63,7 +63,7 @@ impl Telegram {
             .chain_err(|| "GET request failed")
     }
 
-    pub fn next_update<'a>(&'a mut self) -> BoxFuture<'a, Vec<Update>> {
+    pub fn next_update<'a>(&'a mut self) -> BoxFuture<'a, (&mut Telegram, Vec<Update>)> {
         self.get("getUpdates", params!{
             "timeout" => REQ_TIMEOUT,
             "offset" => self.last_update
@@ -81,7 +81,7 @@ impl Telegram {
                     }
                 });
                 self.last_update = result[result.len() - 1].update_id;
-                return Ok(result);
+                return Ok((self, result));
             } else {
                 return Err("Failed to decode updates.".into());
             }

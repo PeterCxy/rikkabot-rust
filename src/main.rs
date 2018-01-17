@@ -44,7 +44,7 @@ fn main() {
 
     // TEST
     let work = tg.next_update()
-        .and_then(|res| {
+        .and_then(|(_, res)| {
             println!("{:?}", res);
             Ok(())
         });
