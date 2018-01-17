@@ -69,15 +69,15 @@ pub struct Response {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RUpdate {
+pub struct Update {
     update_id: i64
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Result {
-    Update(RUpdate),
-    Updates(Vec<RUpdate>)
+    RUpdate(Update),
+    RUpdates(Vec<Update>)
 }
 
 pub type BoxFutureResponse = SFuture<Response>;
