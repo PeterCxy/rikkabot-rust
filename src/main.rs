@@ -43,10 +43,6 @@ fn main() {
     let mut tg = telegram::Telegram::new(core.handle(), &config.token);
 
     // TEST
-    let work = tg.next_update()
-        .and_then(|(_, res)| {
-            println!("{:?}", res);
-            Ok(())
-        });
+    let work = tg.spin_update_loop();
     core.run(work).unwrap();
 }

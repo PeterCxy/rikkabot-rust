@@ -8,6 +8,7 @@ use errors::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use self::futures::{Future, Stream};
+use self::futures::future;
 use self::hyper::{Chunk, Client, Uri};
 use self::hyper_tls::HttpsConnector;
 use self::tokio_core::reactor::{Handle};
@@ -80,12 +81,26 @@ impl Telegram {
                         Ordering::Greater
                     }
                 });
-                self.last_update = result[result.len() - 1].update_id;
+                self.last_update = result[result.len() - 1].update_id + 1;
                 return Ok((self, result));
             } else {
                 return Err("Failed to decode updates.".into());
             }
         }).chain_err(|| "Failed to fetch updates.")
+    }
+
+    /*
+     * Spin up the tail-recursive loop to fetch new messages
+     * TODO: support adding listeners to the loop
+     * TODO: a better way to handle errors
+     *       Currently, it will break on errors
+     */
+    pub fn spin_update_loop<'a>(&'a mut self) -> BoxFuture<'a, ()> {
+        Box::new(self.next_update()
+            .and_then(move |(new_self, res)| {
+                println!("{:?}", res);
+                new_self.spin_update_loop()
+            }))
     }
 }
 
