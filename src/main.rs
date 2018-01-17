@@ -12,13 +12,12 @@ extern crate serde_json;
 extern crate error_chain;
 
 use futures::Future;
-use std::collections::HashMap;
 use std::env;
 use tokio_core::reactor::Core;
 
-mod telegram;
 #[macro_use]
 mod utils;
+mod telegram;
 
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -41,14 +40,10 @@ fn main() {
 
     // Create the tokio event machine
     let mut core = Core::new().unwrap();
-    let tg = telegram::Telegram::new(core.handle(), &config.token);
+    let mut tg = telegram::Telegram::new(core.handle(), &config.token);
 
     // TEST
-    let map = params!{
-        "timeout" => 600,
-        "offset" => 0
-    };
-    let work = tg.get("getUpdates", map)
+    let work = tg.next_update()
         .and_then(|res| {
             println!("{:?}", res);
             Ok(())

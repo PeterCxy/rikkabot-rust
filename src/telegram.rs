@@ -5,6 +5,7 @@ extern crate serde_json;
 extern crate tokio_core;
 
 use errors::*;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use self::futures::{Future, Stream};
 use self::hyper::{Chunk, Client, Uri};
@@ -14,10 +15,12 @@ use self::tokio_core::reactor::{Handle};
 use utils;
 use utils::{SFuture, FutureChainErr};
 
+const REQ_TIMEOUT: u32 = 600;
+
 pub struct Telegram {
     tokio_handle: Handle,
     token: String,
-    last_update: i64
+    pub last_update: i64
 }
 
 // The Telegram API call implementation
@@ -46,7 +49,7 @@ impl Telegram {
             .expect("Illegal URL")
     }
 
-    pub fn get(&self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFutureResponse {
+    pub fn get<'a>(&self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFutureResponse<'a> {
         Client::configure()
             .connector(HttpsConnector::new(4, &self.tokio_handle).unwrap())
             .build(&self.tokio_handle)
@@ -59,6 +62,31 @@ impl Telegram {
             })
             .chain_err(|| "GET request failed")
     }
+
+    pub fn next_update<'a>(&'a mut self) -> SFuture<'a, Vec<Update>> {
+        self.get("getUpdates", params!{
+            "timeout" => REQ_TIMEOUT,
+            "offset" => self.last_update
+        }).and_then(move |resp| {
+            if !resp.ok {
+                return Err("Failed to fetch updates.".into());
+            }
+
+            if let Some(Result::Updates(mut result)) = resp.result {
+                result.sort_by(|x, y| {
+                    if x.update_id < y.update_id {
+                        Ordering::Less
+                    } else {
+                        Ordering::Greater
+                    }
+                });
+                self.last_update = result[result.len() - 1].update_id;
+                return Ok(result);
+            } else {
+                return Err("Failed to decode updates.".into());
+            }
+        }).chain_err(|| "Failed to fetch updates.")
+    }
 }
 
 // Types
@@ -70,14 +98,20 @@ pub struct Response {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Update {
-    update_id: i64
+    update_id: i64,
+    message: Option<Message>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Message {
+    message_id: i64,
+    text: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Result {
-    RUpdate(Update),
-    RUpdates(Vec<Update>)
+    Updates(Vec<Update>)
 }
 
-pub type BoxFutureResponse = SFuture<Response>;
+pub type BoxFutureResponse<'a> = SFuture<'a, Response>;
