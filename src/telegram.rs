@@ -64,15 +64,14 @@ impl Telegram {
     }
 
     pub fn get<'a, 'b>(&'b self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFuture<'a, Response> {
-        self.client
+        Box::new(self.client
             .get(self.uri_for_method_with_params(method, params))
             .and_then(|res| res.body().concat2())
             .chain_err(|| "GET request failed")
             .and_then(|body: Chunk| {
                 serde_json::from_slice::<Response>(&body)
                     .chain_err(|| "Decode failed")
-            })
-            .chain_err(|| "GET request failed")
+            }))
     }
 
     fn next_update<'a>(&'a mut self) -> BoxFuture<'a, (&mut Telegram, Vec<Update>)> {
