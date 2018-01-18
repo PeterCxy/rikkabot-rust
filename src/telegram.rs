@@ -78,6 +78,16 @@ impl Telegram {
             }
 
             if let Some(Result::Updates(mut result)) = resp.result {
+                if result.len() == 0 {
+                    // Do nothing if result is empty
+                    // This happens if no message received
+                    // within timeout
+                    return Ok((self, result));
+                }
+
+                // Telegram API did not guarantee the order of messages
+                // Although in fact they do
+                // To be safe, just ensure the sorting here.
                 result.sort_by(|x, y| {
                     if x.update_id < y.update_id {
                         Ordering::Less
@@ -85,6 +95,10 @@ impl Telegram {
                         Ordering::Greater
                     }
                 });
+
+                // Update the value of `last_update`
+                // On the next request, Telegram will
+                // mark the old messages as `read`.
                 self.last_update = result[result.len() - 1].update_id + 1;
                 return Ok((self, result));
             } else {
