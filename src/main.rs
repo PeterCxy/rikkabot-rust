@@ -43,6 +43,13 @@ fn main() {
     let mut tg = telegram::Telegram::new(core.handle(), &config.token);
 
     // TEST
+    tg.subscribe(|_, tg, update| {
+        tg.subscribe(|id, tg, _| {
+            println!("This should happen alternately.");
+            tg.unsubscribe(id);
+        });
+        println!("{:?}", update);
+    });
     let work = tg.spin_update_loop();
     core.run(work).unwrap();
 }

@@ -1,12 +1,14 @@
 extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
+extern crate rand;
 extern crate serde_json;
 extern crate tokio_core;
 
 use errors::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::rc::Rc;
 use self::futures::{Future, Stream};
 use self::futures::future;
 use self::hyper::{Chunk, Client, Uri};
@@ -21,7 +23,8 @@ const REQ_TIMEOUT: u32 = 600;
 pub struct Telegram {
     tokio_handle: Handle,
     token: String,
-    pub last_update: i64
+    last_update: i64,
+    subscribers: HashMap<i64, Rc<Fn(i64, &mut Telegram, &Update)>>
 }
 
 // The Telegram API call implementation
@@ -33,7 +36,8 @@ impl Telegram {
         Telegram {
             tokio_handle,
             token: String::from(token),
-            last_update: 0
+            last_update: 0,
+            subscribers: HashMap::new()
         }
     }
 
@@ -64,7 +68,7 @@ impl Telegram {
             .chain_err(|| "GET request failed")
     }
 
-    pub fn next_update<'a>(&'a mut self) -> BoxFuture<'a, (&mut Telegram, Vec<Update>)> {
+    fn next_update<'a>(&'a mut self) -> BoxFuture<'a, (&mut Telegram, Vec<Update>)> {
         self.get("getUpdates", params!{
             "timeout" => REQ_TIMEOUT,
             "offset" => self.last_update
@@ -91,16 +95,41 @@ impl Telegram {
 
     /*
      * Spin up the tail-recursive loop to fetch new messages
-     * TODO: support adding listeners to the loop
      * TODO: a better way to handle errors
      *       Currently, it will break on errors
      */
     pub fn spin_update_loop<'a>(&'a mut self) -> BoxFuture<'a, ()> {
         Box::new(self.next_update()
             .and_then(move |(new_self, res)| {
-                println!("{:?}", res);
+                let subscribers = new_self.get_subscribers();
+                // Dispatch every update to every subscriber
+                for u in res.iter() {
+                    for (id, f) in &subscribers {
+                        f(id.clone(), new_self, u);
+                    }
+                }
                 new_self.spin_update_loop()
             }))
+    }
+
+    fn get_subscribers(&mut self) -> HashMap<i64, Rc<Fn(i64, &mut Telegram, &Update)>> {
+        self.subscribers.clone()
+    }
+
+    /*
+     * Subscribe to `update` events
+     * Every callback has its own id
+     * which will be passed as the first argument of the closure.
+     */
+    pub fn subscribe<F>(&mut self, f: F) where F: 'static + Fn(i64, &mut Telegram, &Update) {
+        self.subscribers.insert(rand::random::<i64>(), Rc::new(f));
+    }
+
+    /*
+     * Remove a previously subscribed callback with id
+     */
+    pub fn unsubscribe(&mut self, id: i64) {
+        self.subscribers.remove(&id);
     }
 }
 
