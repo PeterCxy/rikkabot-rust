@@ -10,7 +10,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::rc::Rc;
 use self::futures::{Future, Stream};
-use self::futures::future;
 use self::hyper::{Chunk, Client, Uri};
 use self::hyper_tls::HttpsConnector;
 use self::tokio_core::reactor::{Handle};
