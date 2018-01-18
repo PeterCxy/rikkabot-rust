@@ -11,7 +11,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate error_chain;
 
-use futures::Future;
+use futures::future;
 use std::env;
 use tokio_core::reactor::Core;
 
@@ -47,8 +47,10 @@ fn main() {
         tg.subscribe(|id, tg, _| {
             println!("This should happen alternately.");
             tg.unsubscribe(id);
+            Box::new(future::ok(()))
         });
         println!("{:?}", update);
+        Box::new(future::ok(()))
     });
     let work = tg.spin_update_loop();
     core.run(work).unwrap();

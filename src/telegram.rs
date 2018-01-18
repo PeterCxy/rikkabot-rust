@@ -10,6 +10,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::rc::Rc;
 use self::futures::{Future, Stream};
+use self::futures::future::Executor;
 use self::hyper::{Chunk, Client, Uri};
 use self::hyper_tls::HttpsConnector;
 use self::tokio_core::reactor::{Handle};
@@ -23,7 +24,7 @@ pub struct Telegram {
     tokio_handle: Handle,
     token: String,
     last_update: i64,
-    subscribers: HashMap<i64, Rc<Fn(i64, &mut Telegram, &Update)>>
+    subscribers: HashMap<i64, Rc<Fn(i64, &mut Telegram, &Update) -> BoxFuture<'static, ()>>>
 }
 
 // The Telegram API call implementation
@@ -118,14 +119,19 @@ impl Telegram {
                 // Dispatch every update to every subscriber
                 for u in res.iter() {
                     for (id, f) in &subscribers {
-                        f(id.clone(), new_self, u);
+                        // Executing subscribers will return a Future
+                        let fut = f(id.clone(), new_self, u).map_err(|_| ());
+                        // Add it to the event loop provided by Tokio
+                        if let Err(err) =  new_self.tokio_handle.execute(fut) {
+                            println!("Failed to schedule subscriber {}, {:?}", id, err);
+                        }
                     }
                 }
                 new_self.spin_update_loop()
             }))
     }
 
-    fn get_subscribers(&mut self) -> HashMap<i64, Rc<Fn(i64, &mut Telegram, &Update)>> {
+    fn get_subscribers(&mut self) -> HashMap<i64, Rc<Fn(i64, &mut Telegram, &Update) -> BoxFuture<'static, ()>>> {
         self.subscribers.clone()
     }
 
@@ -134,7 +140,9 @@ impl Telegram {
      * Every callback has its own id
      * which will be passed as the first argument of the closure.
      */
-    pub fn subscribe<F>(&mut self, f: F) where F: 'static + Fn(i64, &mut Telegram, &Update) {
+    pub fn subscribe<F>(&mut self, f: F)
+        where F: 'static + Fn(i64, &mut Telegram, &Update) -> BoxFuture<'static, ()>
+    {
         self.subscribers.insert(rand::random::<i64>(), Rc::new(f));
     }
 
