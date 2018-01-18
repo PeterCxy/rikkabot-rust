@@ -54,7 +54,7 @@ impl Telegram {
             .expect("Illegal URL")
     }
 
-    pub fn get<'a>(&self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFuture<'a, Response> {
+    pub fn get<'a, 'b>(&'b self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFuture<'a, Response> {
         Client::configure()
             .connector(HttpsConnector::new(4, &self.tokio_handle).unwrap())
             .build(&self.tokio_handle)
