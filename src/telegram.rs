@@ -145,6 +145,9 @@ impl Telegram {
      * Subscribe to `update` events
      * Every callback has its own id
      * which will be passed as the first argument of the closure.
+     * 
+     * The subscribers will receive a mutable reference
+     * to this Telegram object in order to unsubscribe if needed.
      */
     pub fn subscribe<F>(&mut self, f: F)
         where F: 'static + Fn(i64, &mut Telegram, &Update) -> BoxFuture<'static, ()>
