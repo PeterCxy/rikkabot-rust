@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use self::futures::{Future, Stream};
 use self::futures::future::Executor;
-use self::hyper::{Chunk, Client, Uri};
+use self::hyper::{Body, Chunk, Client, Uri};
+use self::hyper::client::HttpConnector;
 use self::hyper_tls::HttpsConnector;
 use self::tokio_core::reactor::{Handle};
 
@@ -22,6 +23,7 @@ const REQ_TIMEOUT: u32 = 600;
 
 pub struct Telegram {
     tokio_handle: Handle,
+    client: Client<HttpsConnector<HttpConnector>, Body>,
     token: String,
     last_update: i64,
     subscribers: HashMap<i64, Rc<Fn(i64, &mut Telegram, &Update) -> BoxFuture<'static, ()>>>
@@ -33,8 +35,15 @@ impl Telegram {
      * Initialize a Telegram instance
      */
     pub fn new(tokio_handle: Handle, token: &str) -> Telegram {
+        // Create Hyper client object before anything starts
+        let client = Client::configure()
+            .connector(HttpsConnector::new(4, &tokio_handle).unwrap())
+            .build(&tokio_handle);
+
+        // Initialize the Telegram struct
         Telegram {
             tokio_handle,
+            client,
             token: String::from(token),
             last_update: 0,
             subscribers: HashMap::new()
@@ -55,9 +64,7 @@ impl Telegram {
     }
 
     pub fn get<'a, 'b>(&'b self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFuture<'a, Response> {
-        Client::configure()
-            .connector(HttpsConnector::new(4, &self.tokio_handle).unwrap())
-            .build(&self.tokio_handle)
+        self.client
             .get(self.uri_for_method_with_params(method, params))
             .and_then(|res| res.body().concat2())
             .chain_err(|| "GET request failed")
