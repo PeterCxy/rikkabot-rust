@@ -37,7 +37,8 @@ impl Telegram {
     pub fn new(tokio_handle: Handle, token: &str) -> Telegram {
         // Create Hyper client object before anything starts
         let client = Client::configure()
-            .connector(HttpsConnector::new(4, &tokio_handle).unwrap())
+            .connector(HttpsConnector::new(4, &tokio_handle)
+                .expect("WTF: Cannot create HTTPS agent"))
             .build(&tokio_handle);
 
         // Initialize the Telegram struct
@@ -75,6 +76,7 @@ impl Telegram {
     }
 
     fn next_update<'a>(&'a mut self) -> BoxFuture<'a, (&mut Telegram, Vec<Update>)> {
+        info!("Fetching update since {}", self.last_update);
         Box::new(self.get("getUpdates", params!{
             "timeout" => REQ_TIMEOUT,
             "offset" => self.last_update
@@ -83,14 +85,17 @@ impl Telegram {
             // Just treat it as empty result.
             match result {
                 Ok(resp) => Ok::<Response, Error>(resp),
-                Err(_) => Ok(Response {
-                    ok: false,
-                    result: None
-                })
+                Err(e) => {
+                    error!("Error while fetching new update: {:?}", e);
+                    Ok(Response {
+                        ok: false,
+                        result: None
+                    })
+                }
             }
         }).and_then(move |resp| {
             if !resp.ok {
-                println!("Failed to fetch updates.");
+                warn!("Failed to fetch update.");
                 return Ok((self, vec![]));
             }
 
@@ -119,7 +124,7 @@ impl Telegram {
                 self.last_update = result[result.len() - 1].update_id + 1;
                 return Ok((self, result));
             } else {
-                println!("Failed to fetch updates.");
+                warn!("Failed to fetch update.");
                 return Ok((self, vec![]));
             }
         }))
@@ -140,7 +145,7 @@ impl Telegram {
                             let fut = f(id.clone(), new_self, u).map_err(|_| ());
                             // Add it to the event loop provided by Tokio
                             if let Err(err) =  new_self.tokio_handle.execute(fut) {
-                                println!("Failed to schedule subscriber {}, {:?}", id, err);
+                                error!("Failed to schedule subscriber {}, {:?}", id, err);
                             }
                         }
                     }
