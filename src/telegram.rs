@@ -75,12 +75,23 @@ impl Telegram {
     }
 
     fn next_update<'a>(&'a mut self) -> BoxFuture<'a, (&mut Telegram, Vec<Update>)> {
-        self.get("getUpdates", params!{
+        Box::new(self.get("getUpdates", params!{
             "timeout" => REQ_TIMEOUT,
             "offset" => self.last_update
+        }).then(|result| {
+            // Ignore any error arising from this operation
+            // Just treat it as empty result.
+            match result {
+                Ok(resp) => Ok::<Response, Error>(resp),
+                Err(_) => Ok(Response {
+                    ok: false,
+                    result: None
+                })
+            }
         }).and_then(move |resp| {
             if !resp.ok {
-                return Err("Failed to fetch updates.".into());
+                println!("Failed to fetch updates.");
+                return Ok((self, vec![]));
             }
 
             if let Some(Result::Updates(mut result)) = resp.result {
@@ -108,28 +119,29 @@ impl Telegram {
                 self.last_update = result[result.len() - 1].update_id + 1;
                 return Ok((self, result));
             } else {
-                return Err("Failed to decode updates.".into());
+                println!("Failed to fetch updates.");
+                return Ok((self, vec![]));
             }
-        }).chain_err(|| "Failed to fetch updates.")
+        }))
     }
 
     /*
      * Spin up the tail-recursive loop to fetch new messages
-     * TODO: a better way to handle errors
-     *       Currently, it will break on errors
      */
     pub fn spin_update_loop<'a>(&'a mut self) -> BoxFuture<'a, ()> {
         Box::new(self.next_update()
             .and_then(move |(new_self, res)| {
-                let subscribers = new_self.get_subscribers();
-                // Dispatch every update to every subscriber
-                for u in res.iter() {
-                    for (id, f) in &subscribers {
-                        // Executing subscribers will return a Future
-                        let fut = f(id.clone(), new_self, u).map_err(|_| ());
-                        // Add it to the event loop provided by Tokio
-                        if let Err(err) =  new_self.tokio_handle.execute(fut) {
-                            println!("Failed to schedule subscriber {}, {:?}", id, err);
+                if res.len() != 0 {
+                    let subscribers = new_self.get_subscribers();
+                    // Dispatch every update to every subscriber
+                    for u in res.iter() {
+                        for (id, f) in &subscribers {
+                            // Executing subscribers will return a Future
+                            let fut = f(id.clone(), new_self, u).map_err(|_| ());
+                            // Add it to the event loop provided by Tokio
+                            if let Err(err) =  new_self.tokio_handle.execute(fut) {
+                                println!("Failed to schedule subscriber {}, {:?}", id, err);
+                            }
                         }
                     }
                 }
