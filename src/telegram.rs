@@ -219,8 +219,8 @@ pub struct Response {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Update {
-    update_id: i64,
-    message: Option<Message>
+    pub update_id: i64,
+    pub message: Option<Message>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -231,8 +231,8 @@ pub struct User {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    message_id: i64,
-    text: Option<String>
+    pub message_id: i64,
+    pub text: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
