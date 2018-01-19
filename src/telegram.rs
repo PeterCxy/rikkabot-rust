@@ -1,20 +1,15 @@
-extern crate futures;
-extern crate hyper;
-extern crate hyper_tls;
-extern crate rand;
-extern crate serde_json;
-extern crate tokio_core;
-
 use errors::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::rc::Rc;
-use self::futures::{Future, Stream};
-use self::futures::future::Executor;
-use self::hyper::{Body, Chunk, Client, Uri};
-use self::hyper::client::HttpConnector;
-use self::hyper_tls::HttpsConnector;
-use self::tokio_core::reactor::{Handle};
+use futures::{Future, Stream};
+use futures::future::Executor;
+use hyper::{Body, Chunk, Client, Uri};
+use hyper::client::HttpConnector;
+use hyper_tls::HttpsConnector;
+use rand;
+use serde_json;
+use tokio_core::reactor::{Handle};
 
 use utils;
 use utils::{BoxFuture, FutureChainErr};

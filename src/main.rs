@@ -1,11 +1,15 @@
 extern crate futures;
 extern crate hyper;
+extern crate hyper_tls;
+extern crate percent_encoding;
+extern crate rand;
 extern crate tokio_core;
 
 // Introduce the serde macros for use in other modules
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate serde;
 
 // Macro for chaining errors
 #[macro_use]

@@ -1,15 +1,11 @@
-extern crate futures;
-extern crate serde;
-extern crate serde_json;
-extern crate percent_encoding;
-
 use errors::*;
+use serde_json;
 use std::collections::HashMap;
 use std::error;
 use std::io::prelude::*;
 use std::fs::File;
-use self::futures::Future;
-use self::percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
+use futures::Future;
+use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
