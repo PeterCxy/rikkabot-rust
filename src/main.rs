@@ -16,7 +16,7 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
-use futures::future;
+use futures::Future;
 use std::env;
 use std::panic;
 use tokio_core::reactor::Core;
@@ -25,6 +25,7 @@ use tokio_core::reactor::Core;
 mod utils;
 #[macro_use]
 mod telegram;
+mod bot;
 
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -69,16 +70,7 @@ fn main() {
     let mut core = Core::new().expect("WTF: Cannot create event loop.");
     let mut tg = telegram::Telegram::new(core.handle(), &config.token);
 
-    // TEST
-    tg.subscribe(|_, tg, update| {
-        tg.subscribe(|id, tg, _| {
-            info!("This should happen alternately.");
-            tg.unsubscribe(id);
-            Box::new(future::ok(()))
-        });
-        info!("new update: {:?}", update);
-        Box::new(future::ok(()))
-    });
-    let work = tg.spin_update_loop();
+    let work = bot::bot_main(&mut tg, config)
+        .and_then(|tg| tg.spin_update_loop());
     core.run(work).unwrap();
 }

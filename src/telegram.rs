@@ -49,6 +49,7 @@ macro_rules! assert_result {
         if let None = _result {
             return $d;
         }
+        #[allow(unused_mut)]
         let mut $r = _result.unwrap();
     };
 }
@@ -64,6 +65,7 @@ pub struct Telegram {
 }
 
 // The Telegram API call implementation
+#[allow(dead_code)]
 impl Telegram {
     /*
      * Initialize a Telegram instance
@@ -227,6 +229,12 @@ pub struct Update {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct User {
+    pub id: i64,
+    pub username: Option<String>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     message_id: i64,
     text: Option<String>
@@ -236,5 +244,6 @@ pub struct Message {
 #[serde(untagged)]
 pub enum Result {
     Updates(Vec<Update>),
+    User(User),
     Nothing
 }

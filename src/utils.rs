@@ -63,6 +63,7 @@ macro_rules! params {
     ) => {
         // Expand to a block so that we can directly assign to a variable
         {
+            #[allow(unused_mut)]
             let mut m: HashMap<String, Box<ToString>> = HashMap::new();
             $(
                 m.insert(String::from($x), Box::new($y));
