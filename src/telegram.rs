@@ -64,7 +64,7 @@ impl Telegram {
             .expect("Illegal URL")
     }
 
-    pub fn get<'a, 'b>(&'b self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFuture<'a, Response> {
+    pub fn get<'a, 'b>(&'b self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFuture<'a, Result> {
         Box::new(self.client
             .get(self.uri_for_method_with_params(method, params))
             .and_then(|res| res.body().concat2())
@@ -72,6 +72,17 @@ impl Telegram {
             .and_then(|body: Chunk| {
                 serde_json::from_slice::<Response>(&body)
                     .chain_err(|| "Decode failed")
+                    .and_then(|resp| {
+                        if !resp.ok {
+                            return Err("Telegram server error.".into());
+                        }
+                        
+                        if let Some(result) = resp.result {
+                            return Ok(result);
+                        } else {
+                            return Err("Telegram server error.".into());
+                        }
+                    })
             }))
     }
 
@@ -84,22 +95,14 @@ impl Telegram {
             // Ignore any error arising from this operation
             // Just treat it as empty result.
             match result {
-                Ok(resp) => Ok::<Response, Error>(resp),
+                Ok(resp) => Ok::<Result, Error>(resp),
                 Err(e) => {
                     error!("Error while fetching new update: {:?}", e);
-                    Ok(Response {
-                        ok: false,
-                        result: None
-                    })
+                    Ok(Result::Nothing)
                 }
             }
         }).and_then(move |resp| {
-            if !resp.ok {
-                warn!("Failed to fetch update.");
-                return Ok((self, vec![]));
-            }
-
-            if let Some(Result::Updates(mut result)) = resp.result {
+            if let Result::Updates(mut result) = resp {
                 if result.len() == 0 {
                     // Do nothing if result is empty
                     // This happens if no message received
@@ -202,5 +205,6 @@ pub struct Message {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Result {
-    Updates(Vec<Update>)
+    Updates(Vec<Update>),
+    Nothing
 }
