@@ -19,6 +19,40 @@ use self::tokio_core::reactor::{Handle};
 use utils;
 use utils::{BoxFuture, FutureChainErr};
 
+macro_rules! assert_result {
+    /*
+     * Shorthand to assert the response type
+     * used on `and_then` when calling an API.
+     * 
+     * Replaces $r with the actual value of
+     * the result if it matches $t. Otherwise,
+     * directly end the current function and return $d.
+     * Note that $t must contain $r contained in
+     * the parenthesis.
+     * 
+     * Example:
+     * |result| {
+     *     assert_result!(Result::Update(result), result, default_value);
+     *     // And now `result` will contain the actual result.
+     * }
+     */
+    ($t:pat, $r:ident, $d:expr) => {
+        let _result = {
+            match $r {
+                $t => Some($r),
+                x => {
+                    warn!("Response type mismatch: expected {}, found {:?}", stringify!($t), x);
+                    None
+                }
+            }
+        };
+        if let None = _result {
+            return $d;
+        }
+        let mut $r = _result.unwrap();
+    };
+}
+
 const REQ_TIMEOUT: u32 = 600;
 
 pub struct Telegram {
@@ -101,35 +135,31 @@ impl Telegram {
                     Ok(Result::Nothing)
                 }
             }
-        }).and_then(move |resp| {
-            if let Result::Updates(mut result) = resp {
-                if result.len() == 0 {
-                    // Do nothing if result is empty
-                    // This happens if no message received
-                    // within timeout
-                    return Ok((self, result));
-                }
-
-                // Telegram API did not guarantee the order of messages
-                // Although in fact they do
-                // To be safe, just ensure the sorting here.
-                result.sort_by(|x, y| {
-                    if x.update_id < y.update_id {
-                        Ordering::Less
-                    } else {
-                        Ordering::Greater
-                    }
-                });
-
-                // Update the value of `last_update`
-                // On the next request, Telegram will
-                // mark the old messages as `read`.
-                self.last_update = result[result.len() - 1].update_id + 1;
+        }).and_then(move |result| {
+            assert_result!(Result::Updates(result), result, Ok((self, vec![])));
+            if result.len() == 0 {
+                // Do nothing if result is empty
+                // This happens if no message received
+                // within timeout
                 return Ok((self, result));
-            } else {
-                warn!("Failed to fetch update.");
-                return Ok((self, vec![]));
             }
+
+            // Telegram API did not guarantee the order of messages
+            // Although in fact they do
+            // To be safe, just ensure the sorting here.
+            result.sort_by(|x, y| {
+                if x.update_id < y.update_id {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            });
+
+            // Update the value of `last_update`
+            // On the next request, Telegram will
+            // mark the old messages as `read`.
+            self.last_update = result[result.len() - 1].update_id + 1;
+            return Ok((self, result));
         }))
     }
 

@@ -23,6 +23,7 @@ use tokio_core::reactor::Core;
 
 #[macro_use]
 mod utils;
+#[macro_use]
 mod telegram;
 
 mod errors {
