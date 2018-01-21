@@ -74,7 +74,7 @@ fn bot_on_message<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &
             }
         }
     }
-    // TODO: implement an automatic sticker bot
+    // TODO: implement an automatic sticker bot and allow user to get statistics / a random sticker
     utils::return_empty()
 }
 
