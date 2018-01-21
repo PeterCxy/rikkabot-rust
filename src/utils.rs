@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::error;
 use std::io::prelude::*;
 use std::fs::File;
-use futures::Future;
+use futures::{future, Future};
 use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,6 +67,10 @@ macro_rules! params {
             m
         }
     }
+}
+
+pub fn return_empty<'a>() -> BoxFuture<'a, ()> {
+    Box::new(future::ok(()))
 }
 
 // Glue code to make error-chain work with futures
