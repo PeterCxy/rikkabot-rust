@@ -75,6 +75,22 @@ macro_rules! hashmap {
     }
 }
 
+macro_rules! string_hashmap {
+    (
+        $vt: ty;
+        $(
+            $x:expr => $y:expr
+        ),*
+    ) => {
+        hashmap! {
+            String; $vt;
+            $(
+                String::from($x) => $y
+            ),*
+        }
+    }
+}
+
 /*
  * Build HTTP request params (HashMap<String, Box<ToString>>)
  * Usage:
@@ -89,10 +105,10 @@ macro_rules! params {
             $x:expr => $y:expr
         ),*
     ) => {
-        hashmap!{
-            String; Box<ToString>;
+        string_hashmap!{
+            Box<ToString>;
             $(
-                String::from($x) => Box::new($y)
+                $x => Box::new($y)
             ),*
         }
     }

@@ -3,6 +3,17 @@ use std::collections::HashMap;
 use telegram::{Message, Result, Telegram, Update};
 use utils::{self, BoxFuture, Config, FutureChainErr};
 
+macro_rules! cmd_fn_type {
+    () => (fn (&mut Telegram, &Config, &str, &Message, Vec<&str>) -> BoxFuture<'a, ()>)
+}
+
+fn command_map<'a>() -> HashMap<String, cmd_fn_type!()> {
+    string_hashmap! {
+        cmd_fn_type!();
+        "hello" => cmd_hello
+    }
+}
+
 /*
  * Initialize the bot
  * Fetches the username and sets up the subscriber
@@ -53,9 +64,22 @@ fn bot_on_message<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &
             // And see what the command is.
             let cmd_name = cmd.replacen("/", "", 1).replace(username_tail, "");
             info!("Command invoked: /{} from message {}", cmd_name, msg.message_id);
-            // TODO: Finish implementation
+            
+            // Find the implementation of the invoked command
+            let cmd_map = command_map();
+            if cmd_map.contains_key(&cmd_name) {
+                return cmd_map.get(&cmd_name).unwrap()(tg, config, username, msg, args);
+            } else {
+                warn!("Unkown command: /{}", cmd_name);
+            }
         }
     }
     // TODO: implement an automatic sticker bot
+    utils::return_empty()
+}
+
+#[allow(unused_variables)]
+fn cmd_hello<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
+    info!("/hello invoked!");
     utils::return_empty()
 }
