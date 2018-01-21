@@ -44,6 +44,38 @@ pub fn build_query_string(params: HashMap<String, Box<ToString>>) -> String {
 }
 
 /*
+ * A typed HashMap literal.
+ * Automatic inference does not seem to work
+ * when the value needs to be boxed.
+ * 
+ * Syntax:
+ * 
+ * let m = hashmap!{
+ *     KeyType; ValueType;
+ *     key1 => value1,
+ *     key2 => value2,
+ *     ....
+ * };
+ */
+macro_rules! hashmap {
+    (
+        $kt:ty; $vt: ty;
+        $(
+            $x:expr => $y:expr
+        ),*
+    ) => {
+        {
+            #[allow(unused_mut)]
+            let mut m: HashMap<$kt, $vt> = HashMap::new();
+            $(
+                m.insert($x, $y);
+            )*
+            m
+        }
+    }
+}
+
+/*
  * Build HTTP request params (HashMap<String, Box<ToString>>)
  * Usage:
  *  let options = params!{
@@ -57,14 +89,11 @@ macro_rules! params {
             $x:expr => $y:expr
         ),*
     ) => {
-        // Expand to a block so that we can directly assign to a variable
-        {
-            #[allow(unused_mut)]
-            let mut m: HashMap<String, Box<ToString>> = HashMap::new();
+        hashmap!{
+            String; Box<ToString>;
             $(
-                m.insert(String::from($x), Box::new($y));
-            )*
-            m
+                String::from($x) => Box::new($y)
+            ),*
         }
     }
 }
