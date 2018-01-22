@@ -271,5 +271,6 @@ pub struct Message {
 pub enum Result {
     Updates(Vec<Update>),
     User(User),
+    Message(Message),
     Nothing
 }
