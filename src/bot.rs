@@ -1,6 +1,7 @@
 use futures::Future;
 use std::collections::HashMap;
 use telegram::{Message, Result, Telegram, Update};
+use time;
 use utils::{self, BoxFuture, Config, FutureChainErr};
 
 macro_rules! cmd_fn_type {
@@ -10,7 +11,8 @@ macro_rules! cmd_fn_type {
 fn command_map<'a>() -> HashMap<String, cmd_fn_type!()> {
     string_hashmap! {
         cmd_fn_type!();
-        "hello" => cmd_hello
+        "hello" => cmd_hello,
+        "ping" => cmd_ping
     }
 }
 
@@ -84,5 +86,15 @@ fn cmd_hello<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &Messa
         "chat_id" => msg.chat.id,
         "reply_to_message_id" => msg.message_id,
         "text" => "Hello, Rikka Rikka Ri~"
+    }).map(|_| ()))
+}
+
+#[allow(unused_variables)]
+fn cmd_ping<'a>(tg: &mut Telegram, config: &Config, usernasme: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
+    let t = time::get_time();
+    Box::new(tg.post("sendMessage", params!{
+        "chat_id" => msg.chat.id,
+        "reply_to_message_id" => msg.message_id,
+        "text" => format!("Latency: {}ms", t.sec * 1000 + (t.nsec as i64) / 1000 / 1000 - msg.date * 1000)
     }).map(|_| ()))
 }

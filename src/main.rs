@@ -3,6 +3,7 @@ extern crate hyper;
 extern crate hyper_tls;
 extern crate percent_encoding;
 extern crate rand;
+extern crate time;
 extern crate tokio_core;
 
 // Introduce the serde macros for use in other modules
