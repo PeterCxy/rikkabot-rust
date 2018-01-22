@@ -177,7 +177,11 @@ impl Telegram {
                     for u in res.iter() {
                         for (id, f) in &subscribers {
                             // Executing subscribers will return a Future
-                            let fut = f(id.clone(), new_self, u).map_err(|_| ());
+                            let fut = f(id.clone(), new_self, u)
+                                .map_err(|e| {
+                                    warn!("Error suppressed: {:?}", e);
+                                    ()
+                                });
                             // Add it to the event loop provided by Tokio
                             if let Err(err) =  new_self.tokio_handle.execute(fut) {
                                 error!("Failed to schedule subscriber {}, {:?}", id, err);
