@@ -80,6 +80,9 @@ fn bot_on_message<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &
 
 #[allow(unused_variables)]
 fn cmd_hello<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
-    info!("/hello invoked!");
-    utils::return_empty()
+    Box::new(tg.post("sendMessage", params!{
+        "chat_id" => msg.chat.id,
+        "reply_to_message_id" => msg.message_id,
+        "text" => "Hello, Rikka Rikka Ri~"
+    }).map(|_| ()))
 }

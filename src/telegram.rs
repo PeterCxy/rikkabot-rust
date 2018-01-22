@@ -1,10 +1,11 @@
+use errors;
 use errors::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::rc::Rc;
 use futures::{Future, Stream};
 use futures::future::Executor;
-use hyper::{Body, Chunk, Client, Uri};
+use hyper::{Body, Chunk, Client, Method, Request, Uri};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use rand;
@@ -100,21 +101,25 @@ impl Telegram {
             .get(self.uri_for_method_with_params(method, params))
             .and_then(|res| res.body().concat2())
             .chain_err(|| "GET request failed")
-            .and_then(|body: Chunk| {
-                serde_json::from_slice::<Response>(&body)
-                    .chain_err(|| "Decode failed")
-                    .and_then(|resp| {
-                        if !resp.ok {
-                            return Err("Telegram server error.".into());
-                        }
-                        
-                        if let Some(result) = resp.result {
-                            return Ok(result);
-                        } else {
-                            return Err("Telegram server error.".into());
-                        }
-                    })
-            }))
+            .and_then(parse_body))
+    }
+
+    pub fn post<'a, 'b>(&'b self, method: &str, params: HashMap<String, Box<ToString>>) -> BoxFuture<'a, Result> {
+        Box::new(self.client
+            .request({
+                let mut req: Request<Body> = Request::new(Method::Post, self.uri_for_method(method));
+                let qs = utils::build_query_string(params);
+                req.set_body(qs.clone());
+                {
+                    let headers = req.headers_mut();
+                    headers.set_raw("content-length", format!("{}", qs.len()));
+                    headers.set_raw("content-type", "application/x-www-form-urlencoded");
+                }
+                req
+            })
+            .and_then(|res| res.body().concat2())
+            .chain_err(|| "POST request failed")
+            .and_then(parse_body))
     }
 
     fn next_update<'a>(&'a mut self) -> BoxFuture<'a, (&mut Telegram, Vec<Update>)> {
@@ -210,6 +215,22 @@ impl Telegram {
     }
 }
 
+fn parse_body(body: Chunk) -> errors::Result<Result> {
+    serde_json::from_slice::<Response>(&body)
+        .chain_err(|| "Decode failed")
+        .and_then(|resp| {
+            if !resp.ok {
+                return Err("Telegram server error.".into());
+            }
+                        
+            if let Some(result) = resp.result {
+                return Ok(result);
+            } else {
+                return Err("Telegram server error.".into());
+            }
+        })
+}
+
 // Types
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Response {
@@ -230,8 +251,14 @@ pub struct User {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Chat {
+    pub id: i64
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     pub message_id: i64,
+    pub chat: Chat,
     pub text: Option<String>
 }
 
