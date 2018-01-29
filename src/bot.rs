@@ -2,6 +2,7 @@ use futures::Future;
 use rand;
 use rand::Rng;
 use state::State;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use telegram::{Message, Result, Telegram, Update, User};
 use time;
@@ -147,15 +148,22 @@ fn random_sticker(state: &State) -> Option<String> {
         return None;
     }
     let rnd_target = rand::thread_rng().gen_range(0, total);
-    let mut keys: Vec<String> = state.keys().into_iter()
+    let mut records: Vec<(String, i64)> = state.keys().into_iter()
         .filter(|k| k.starts_with("sticker_") && k != "sticker_total")
-        .collect();
-    rand::thread_rng().shuffle(&mut keys);
+        .map(|k| (k.clone(), state.get::<i64>(&k).unwrap()))
+        .collect();    
+    records.sort_by(|&(_, v1), &(_, v2)| {
+        if v1 < v2 {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
+    });
     let mut acc: i64 = 0;
-    for key in keys {
-        acc += state.get::<i64>(&key).unwrap();
+    for (k, v) in records {
+        acc += v;
         if acc >= rnd_target {
-            return Some(key.replace("sticker_", ""));
+            return Some(k.replace("sticker_", ""));
         }
     }
     None
