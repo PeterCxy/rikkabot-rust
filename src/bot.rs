@@ -147,13 +147,12 @@ fn random_sticker(state: &State) -> Option<String> {
         return None;
     }
     let rnd_target = rand::thread_rng().gen_range(0, total);
-    let mut keys = state.keys();
+    let mut keys: Vec<String> = state.keys().into_iter()
+        .filter(|k| k.starts_with("sticker_") && k != "sticker_total")
+        .collect();
     rand::thread_rng().shuffle(&mut keys);
     let mut acc: i64 = 0;
-    for key in state.keys() {
-        if !key.starts_with("sticker_") || key == "sticker_total" {
-            continue;
-        }
+    for key in keys {
         acc += state.get::<i64>(&key).unwrap();
         if acc >= rnd_target {
             return Some(key.replace("sticker_", ""));
