@@ -29,6 +29,10 @@ impl State {
                 .and_then(|value| FromStr::from_str(value).ok())
     }
 
+    pub fn keys(&self) -> Vec<String> {
+        self.state.borrow().keys().map(|k| k.to_string()).collect()
+    }
+
     pub fn to_json(&self) -> String {
         serde_json::to_string(self.state.borrow().deref()).unwrap()
     }

@@ -1,4 +1,6 @@
 use futures::Future;
+use rand;
+use rand::Rng;
 use state::State;
 use std::collections::HashMap;
 use telegram::{Message, Result, Telegram, Update, User};
@@ -14,7 +16,8 @@ fn command_map<'a>() -> HashMap<String, cmd_fn_type!()> {
         cmd_fn_type!();
         "hello" => cmd_hello,
         "ping" => cmd_ping,
-        "stats" => cmd_stats
+        "stats" => cmd_stats,
+        "rikka" => cmd_rikka
     }
 }
 
@@ -129,5 +132,44 @@ fn cmd_stats<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &s
         "reply_to_message_id" => msg.message_id,
         "text" => format!("```\n{}\n```", state.to_json()),
         "parse_mode" => "markdown"
+    }).map(|_| ()))
+}
+
+/*
+ * Choose a random sticker
+ * based on the rate of appearance of all the 
+ * recorded stickers sent by Rikka.
+ * return None if error occurred.
+ */
+fn random_sticker(state: &State) -> Option<String> {
+    let total: i64 = state.get("sticker_total").unwrap_or(0);
+    if total == 0 {
+        return None;
+    }
+    let rnd_target = rand::thread_rng().gen_range(0, total);
+    let mut keys = state.keys();
+    rand::thread_rng().shuffle(&mut keys);
+    let mut acc: i64 = 0;
+    for key in state.keys() {
+        if !key.starts_with("sticker_") || key == "sticker_total" {
+            continue;
+        }
+        acc += state.get::<i64>(&key).unwrap();
+        if acc >= rnd_target {
+            return Some(key.replace("sticker_", ""));
+        }
+    }
+    None
+}
+
+#[allow(unused_variables)]
+fn cmd_rikka<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
+    let sticker_id = random_sticker(state);
+    if let None = sticker_id {
+        return utils::return_empty();
+    }
+    Box::new(tg.post("sendSticker", params!{
+        "chat_id" => msg.chat.id,
+        "sticker" => sticker_id.unwrap()
     }).map(|_| ()))
 }
