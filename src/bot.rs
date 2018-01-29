@@ -1,18 +1,20 @@
 use futures::Future;
+use state::State;
 use std::collections::HashMap;
-use telegram::{Message, Result, Telegram, Update};
+use telegram::{Message, Result, Telegram, Update, User};
 use time;
 use utils::{self, BoxFuture, Config, FutureChainErr};
 
 macro_rules! cmd_fn_type {
-    () => (fn (&mut Telegram, &Config, &str, &Message, Vec<&str>) -> BoxFuture<'a, ()>)
+    () => (fn (&mut Telegram, &State, &Config, &str, &Message, Vec<&str>) -> BoxFuture<'a, ()>)
 }
 
 fn command_map<'a>() -> HashMap<String, cmd_fn_type!()> {
     string_hashmap! {
         cmd_fn_type!();
         "hello" => cmd_hello,
-        "ping" => cmd_ping
+        "ping" => cmd_ping,
+        "stats" => cmd_stats
     }
 }
 
@@ -27,17 +29,18 @@ pub fn bot_main<'a>(tg: &'a mut Telegram, config: Config) -> BoxFuture<'a, &mut 
             assert_result!(Result::User(result), result, Err("I must exist.".into()));
             let name = result.username.expect("I must have a username.");
             info!("I am @{}", name);
-            tg.subscribe(move |_, tg, update| bot_on_update(tg, &config, &name, update));
+            let state = State::new(); // TODO: Load initial state from disk
+            tg.subscribe(move |_, tg, update| bot_on_update(tg, &state, &config, &name, update));
             return Ok(tg);
         })
         .chain_err(|| "Failed to fetch bot username.")
 }
 
-fn bot_on_update<'a>(tg: &mut Telegram, config: &Config, username: &str, update: &Update) -> BoxFuture<'a, ()> {
+fn bot_on_update<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &str, update: &Update) -> BoxFuture<'a, ()> {
     info!("New update received: {:?}", update);
     if let Some(ref msg) = update.message {
         // A new Message
-        bot_on_message(tg, config, username, msg)
+        bot_on_message(tg, state, config, username, msg)
     } else {
         // Unrecognized update. Just ignore it.
         warn!("Unrecognized update received. Ignoring.");
@@ -46,7 +49,7 @@ fn bot_on_update<'a>(tg: &mut Telegram, config: &Config, username: &str, update:
 }
 
 #[allow(unused_variables)]
-fn bot_on_message<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &Message) -> BoxFuture<'a, ()> {
+fn bot_on_message<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &str, msg: &Message) -> BoxFuture<'a, ()> {
     if let Some(ref text) = msg.text {
         // A text message
         if text.starts_with("/") {
@@ -70,18 +73,38 @@ fn bot_on_message<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &
             // Find the implementation of the invoked command
             let cmd_map = command_map();
             if cmd_map.contains_key(&cmd_name) {
-                return cmd_map.get(&cmd_name).unwrap()(tg, config, username, msg, args);
+                return cmd_map.get(&cmd_name).unwrap()(tg, state, config, username, msg, args);
             } else {
                 warn!("Unkown command: /{}", cmd_name);
             }
         }
+    } else if let Some(ref sticker) = msg.sticker {
+        if is_rikka(config, &msg.from) {
+            info!("Sticker from Rikka! ID: {}", sticker.file_id);
+            // Write to state
+            let key = format!("sticker_{}", sticker.file_id);
+            let num: i64 = state.get(&key).unwrap_or(0) + 1;
+            info!("Recorded use of sticker {}: {}", sticker.file_id, num);
+            state.put(&key, &num);
+            let total: i64 = state.get("sticker_total").unwrap_or(0) + 1;
+            info!("Recorded total stickers: {}", total);
+            state.put("sticker_total", &total);
+        }
     }
-    // TODO: implement an automatic sticker bot and allow user to get statistics / a random sticker
     utils::return_empty()
 }
 
+fn is_rikka(config: &Config, usr: &Option<User>) -> bool {
+    let res = usr.as_ref().and_then(|user| user.username.as_ref())
+        .and_then(|username| Some(username == &config.rikka_name));
+    match res {
+        Some(result) => result,
+        None => false
+    }
+}
+
 #[allow(unused_variables)]
-fn cmd_hello<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
+fn cmd_hello<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
     Box::new(tg.post("sendMessage", params!{
         "chat_id" => msg.chat.id,
         "reply_to_message_id" => msg.message_id,
@@ -90,11 +113,21 @@ fn cmd_hello<'a>(tg: &mut Telegram, config: &Config, username: &str, msg: &Messa
 }
 
 #[allow(unused_variables)]
-fn cmd_ping<'a>(tg: &mut Telegram, config: &Config, usernasme: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
+fn cmd_ping<'a>(tg: &mut Telegram, state: &State, config: &Config, usernasme: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
     let t = time::get_time();
     Box::new(tg.post("sendMessage", params!{
         "chat_id" => msg.chat.id,
         "reply_to_message_id" => msg.message_id,
         "text" => format!("Latency: {}ms", t.sec * 1000 + (t.nsec as i64) / 1000 / 1000 - msg.date * 1000)
+    }).map(|_| ()))
+}
+
+#[allow(unused_variables)]
+fn cmd_stats<'a>(tg: &mut Telegram, state: &State, config: &Config, usernasme: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
+    Box::new(tg.post("sendMessage", params!{
+        "chat_id" => msg.chat.id,
+        "reply_to_message_id" => msg.message_id,
+        "text" => format!("```\n{}\n```", state.to_json()),
+        "parse_mode" => "markdown"
     }).map(|_| ()))
 }

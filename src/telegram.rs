@@ -264,7 +264,14 @@ pub struct Message {
     pub message_id: i64,
     pub date: i64,
     pub chat: Chat,
-    pub text: Option<String>
+    pub from: Option<User>,
+    pub text: Option<String>,
+    pub sticker: Option<Sticker>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Sticker {
+    pub file_id: String
 }
 
 #[derive(Debug, Serialize, Deserialize)]

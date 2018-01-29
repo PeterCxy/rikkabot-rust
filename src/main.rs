@@ -28,6 +28,7 @@ use tokio_core::reactor::Core;
 
 #[macro_use]
 mod utils;
+mod state;
 #[macro_use]
 mod telegram;
 mod bot;
