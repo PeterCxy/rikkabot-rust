@@ -1,4 +1,5 @@
 extern crate futures;
+extern crate futures_cpupool;
 extern crate hyper;
 extern crate hyper_tls;
 extern crate percent_encoding;
@@ -22,8 +23,10 @@ extern crate pretty_env_logger;
 extern crate log;
 
 use futures::Future;
+use futures_cpupool::CpuPool;
 use std::env;
 use std::panic;
+use std::rc::Rc;
 use tokio_core::reactor::Core;
 
 #[macro_use]
@@ -75,8 +78,9 @@ fn main() {
     // Create the tokio event machine
     let mut core = Core::new().expect("WTF: Cannot create event loop.");
     let mut tg = telegram::Telegram::new(core.handle(), &config.token);
+    let pool = Rc::new(CpuPool::new(4));
 
-    let work = bot::bot_main(&mut tg, config)
+    let work = bot::bot_main(&mut tg, config, pool.clone())
         .and_then(|tg| tg.spin_update_loop());
     core.run(work).unwrap();
 }

@@ -2,3 +2,4 @@
 **/*.rs.bk
 example/my.json
 Cargo.lock
+state.json

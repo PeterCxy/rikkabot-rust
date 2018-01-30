@@ -1,9 +1,11 @@
 use futures::Future;
+use futures_cpupool::CpuPool;
 use rand;
 use rand::Rng;
 use state::State;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::rc::Rc;
 use telegram::{Message, Result, Telegram, Update, User};
 use time;
 use utils::{self, BoxFuture, Config, FutureChainErr};
@@ -27,15 +29,22 @@ fn command_map<'a>() -> HashMap<String, cmd_fn_type!()> {
  * Fetches the username and sets up the subscriber
  * Passes the Telegram object reference back.
  */
-pub fn bot_main<'a>(tg: &'a mut Telegram, config: Config) -> BoxFuture<'a, &mut Telegram> {
+pub fn bot_main<'a>(tg: &'a mut Telegram, config: Config, pool: Rc<CpuPool>) -> BoxFuture<'a, &'a mut Telegram> {
     tg.get("getMe", params!{})
-        .and_then(move |result| {
+        .and_then(|result| {
             assert_result!(Result::User(result), result, Err("I must exist.".into()));
+            Ok(result)
+        })
+        .and_then(move |result| {
             let name = result.username.expect("I must have a username.");
             info!("I am @{}", name);
-            let state = State::new(); // TODO: Load initial state from disk
+            let state = State::new(pool.clone(), config.state_file.clone());
+            state.load()
+                .map(move |state| (config, state, name))
+        })
+        .and_then(move |(config, state, name)| {
             tg.subscribe(move |_, tg, update| bot_on_update(tg, &state, &config, &name, update));
-            return Ok(tg);
+            Ok(tg)
         })
         .chain_err(|| "Failed to fetch bot username.")
 }
@@ -93,6 +102,7 @@ fn bot_on_message<'a>(tg: &mut Telegram, state: &State, config: &Config, usernam
             let total: i64 = state.get("sticker_total").unwrap_or(0) + 1;
             info!("Recorded total stickers: {}", total);
             state.put("sticker_total", &total);
+            return state.save_if_needed();
         }
     }
     utils::return_empty()

@@ -5,12 +5,14 @@ use std::error;
 use std::io::prelude::*;
 use std::fs::File;
 use futures::{future, Future};
+use futures_cpupool::CpuPool;
 use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub token: String,
-    pub rikka_name: String
+    pub rikka_name: String,
+    pub state_file: String
 }
 
 /* Load configuration from file
@@ -24,11 +26,32 @@ pub fn load_config(config: &str) -> Result<Config> {
 /*
  * Read file to a string
  */
-fn read_file_str(file: &str) -> Result<String> {
+pub fn read_file_str(file: &str) -> Result<String> {
     let mut file = File::open(file)?;
     let mut ret = String::new();
     file.read_to_string(&mut ret)?;
     Ok(ret)
+}
+
+pub fn read_file_str_async<'a>(pool: &CpuPool, file: String) -> BoxFuture<'a, String> {
+    Box::new(pool.spawn_fn(move || {
+        read_file_str(&file)
+    }))
+}
+
+/*
+ * Write string to file
+ */
+pub fn write_file_str(file: &str, text: &str) -> Result<()> {
+    let mut file = File::create(file)?;
+    file.write_all(text.as_bytes())
+        .chain_err(|| "Failed to write to file")
+}
+
+pub fn write_file_str_async<'a>(pool: &CpuPool, file: String, text: String) -> BoxFuture<'a, ()> {
+    Box::new(pool.spawn_fn(move || {
+        write_file_str(&file, &text)
+    }))
 }
 
 /*

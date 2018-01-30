@@ -1,4 +1,5 @@
 {
   "token": "my-tg-bot-token",
-  "rikka_name": "RikkaW"
+  "rikka_name": "RikkaW",
+  "state_file": "state.json"
 }
