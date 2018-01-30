@@ -9,7 +9,7 @@ use std::rc::Rc;
 use utils;
 use utils::BoxFuture;
 
-const SAVE_THRESHOLD: i32 = 10;
+const SAVE_THRESHOLD: i32 = 30;
 
 /*
  * A State to be used in a single-threaded context
