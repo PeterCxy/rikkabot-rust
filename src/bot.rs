@@ -10,6 +10,15 @@ use telegram::{Message, Result, Telegram, Update, User};
 use time;
 use utils::{self, BoxFuture, Config, FutureChainErr};
 
+const HELP_STR: &str = r#"
+Hello, I am the bot that tries to become Rikka! (or at least one day ^_^)
+
+/hello - Say hello to Rikka!
+/help - Print this message.
+/ping - Is Rikka here now?
+/rikka - Rikka Rikka Ri!
+"#;
+
 macro_rules! cmd_fn_type {
     () => (fn (&mut Telegram, &State, &Config, &str, &Message, Vec<&str>) -> BoxFuture<'a, ()>)
 }
@@ -18,6 +27,8 @@ fn command_map<'a>() -> HashMap<String, cmd_fn_type!()> {
     string_hashmap! {
         cmd_fn_type!();
         "hello" => cmd_hello,
+        "help" => cmd_help,
+        "print_cmds" => cmd_print_cmds,
         "ping" => cmd_ping,
         "stats" => cmd_stats,
         "rikka" => cmd_rikka
@@ -123,6 +134,29 @@ fn cmd_hello<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &s
         "chat_id" => msg.chat.id,
         "reply_to_message_id" => msg.message_id,
         "text" => "Hello, Rikka Rikka Ri~"
+    }).map(|_| ()))
+}
+
+#[allow(unused_variables)]
+fn cmd_help<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
+    Box::new(tg.post("sendMessage", params!{
+        "chat_id" => msg.chat.id,
+        "reply_to_message_id" => msg.message_id,
+        "text" => HELP_STR
+    }).map(|_| ()))
+}
+
+// Hidden command: print available commands for use with BotFather
+#[allow(unused_variables)]
+fn cmd_print_cmds<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
+    let cmds: Vec<String> = String::from(HELP_STR).lines()
+        .filter(|l| l.starts_with("/"))
+        .map(|l| String::from(&l[1..]))
+        .collect();
+    Box::new(tg.post("sendMessage", params!{
+        "chat_id" => msg.chat.id,
+        "reply_to_message_id" => msg.message_id,
+        "text" => cmds.join("\n")
     }).map(|_| ()))
 }
 
