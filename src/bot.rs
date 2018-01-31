@@ -162,7 +162,7 @@ fn cmd_print_cmds<'a>(tg: &mut Telegram, state: &State, config: &Config, usernam
 
 #[allow(unused_variables)]
 fn cmd_ping<'a>(tg: &mut Telegram, state: &State, config: &Config, username: &str, msg: &Message, args: Vec<&str>) -> BoxFuture<'a, ()> {
-    let t = time::get_time();
+    let t = time::now_utc().to_timespec();
     Box::new(tg.post("sendMessage", params!{
         "chat_id" => msg.chat.id,
         "reply_to_message_id" => msg.message_id,
